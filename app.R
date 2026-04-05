@@ -17,7 +17,7 @@ methods_db <- list(
 
   cohort = list(
     title = "Cohort (Prospective) Study", icon = "\U0001F52C",
-    category = "Study Design", cat_color = "#6C5CE7",
+    category = "Study Design", cat_color = "#0077b6",
     description = "Subjects classified by exposure status and followed forward in time to observe disease incidence. All three effect measures \u2014 RD, RR, and OR \u2014 are directly estimable.",
     formula = "RD = p\u0302\u2081 \u2212 p\u0302\u2082    RR = p\u0302\u2081 / p\u0302\u2082    OR = ad / bc",
     notes = "The gold standard for establishing temporal sequence between exposure and disease. Expensive and time-consuming, especially for rare diseases.",
@@ -39,7 +39,7 @@ prop.test(c(a,c), c(a+b,c+d), correct=TRUE)', r_packages = "base R"),
 
   case_control = list(
     title = "Case-Control Study", icon = "\U0001F50D",
-    category = "Study Design", cat_color = "#6C5CE7",
+    category = "Study Design", cat_color = "#0077b6",
     description = "Subjects selected by disease status; exposure assessed retrospectively. Only the OR is directly estimable. If disease is rare (< 10%), OR \u2248 RR.",
     formula = "OR = ad / bc \u2248 RR (rare disease)",
     notes = "Cannot estimate RD or RR directly \u2014 sampling fractions are unknown. The exposure-odds ratio equals the disease-odds ratio regardless of sampling strategy.",
@@ -57,7 +57,7 @@ cat("OR =", round(OR,2), "95% CI:", round(CI,2), "\\n")', r_packages = "base R")
 
   cross_sectional = list(
     title = "Cross-Sectional Study", icon = "\U0001F4CA",
-    category = "Study Design", cat_color = "#6C5CE7",
+    category = "Study Design", cat_color = "#0077b6",
     description = "Exposure and disease measured simultaneously. Can estimate prevalence and OR. Cannot establish temporal sequence.",
     formula = "Prevalence ratio = prev\u2081 / prev\u2082    OR = ad / bc",
     notes = "Useful for estimating disease burden and generating hypotheses. Number of cases not fixed in advance.",
@@ -226,16 +226,143 @@ mantelhaen.test(tab, correct=TRUE)', r_packages = "base R"),
     title = "Multiple Logistic Regression", icon = "\U0001F4C8",
     category = "Logistic Regression", cat_color = "#E84393",
     description = "Controls for many confounders simultaneously. Handles continuous and categorical predictors. e\u1D5D = adjusted OR.",
-    formula = "log(p/(1\u2212p)) = \u03B1 + \u03B2\u2081x\u2081 + \u2026 + \u03B2\u2096x\u2096\nBinary x: OR = e^\u03B2    Continuous x: OR = e^(\u0394\u00B7\u03B2)    Categorical: k\u22121 dummies",
-    notes = "For case-control: ORs valid but predicted probabilities NOT generalizable. Check Pearson residuals for outliers.",
-    has_input = FALSE, input_type = "none", r_code = NULL,
-    r_template = 'model <- glm(disease ~ exposure + age + sex, data=df,
+    formula = "log(p/(1\u2212p)) = \u03B1 + \u03B2\u2081x\u2081 + \u2026 + \u03B2\u2096x\u2096\nBinary/dummy x: OR = e^\u03B2    Continuous x: OR = e^(\u0394\u00B7\u03B2)    Categorical: k\u22121 dummies",
+    notes = "RECOGNITION CUES:\n\u2022 Problem says 'logistic regression was run' or gives coefficients + SEs\n\u2022 Intercept + predictor coefficients (not a 2\u00D72 table)\n\u2022 Dummy-coded groups \u2192 \u03B2 = log(OR) vs. reference group\n\u2022 Continuous predictor \u2192 \u03B2 = log(OR) per 1-unit increase; use \u0394 for other increments\n\nADJUSTED vs. CRUDE ORs:\n\u2022 Adding covariates (e.g., BMI) to the model produces ADJUSTED ORs\n\u2022 If adjusted OR \u2260 crude OR, the covariate is a confounder\n\u2022 Each \u03B2 is interpreted holding all other predictors constant",
+    has_input = TRUE, input_type = "logistic_coef",
+    r_code = function(beta, se, delta=1) {
+      lnOR <- beta * delta; OR <- exp(lnOR)
+      se_delta <- se * abs(delta)
+      CI <- exp(lnOR + c(-1,1) * qnorm(0.975) * se_delta)
+      z <- beta / se; pval <- 2 * (1 - pnorm(abs(z)))
+      header <- if (delta == 1) {
+        paste0("Regression coefficient (\u03B2): ", round(beta, 4),
+               "\nStandard error:             ", round(se, 4),
+               "\n\n\u2192 OR = e^\u03B2 = e^(", round(beta,4), ") = ", round(OR, 4))
+      } else {
+        paste0("Regression coefficient (\u03B2): ", round(beta, 4),
+               "\nStandard error:             ", round(se, 4),
+               "\nUnit change (\u0394):            ", delta,
+               "\n\n\u2192 OR per ", delta, "-unit change = e^(\u0394\u00B7\u03B2) = e^(", delta, " \u00D7 ", round(beta,4), ") = e^(", round(lnOR,4), ") = ", round(OR, 4))
+      }
+      paste0(header,
+             "\n\n\u2500\u2500\u2500 95% CI CALCULATION (work on ln scale) \u2500\u2500\u2500",
+             "\n  ln(OR) \u00B1 1.96 \u00D7 SE = ", round(lnOR,4), " \u00B1 ", round(qnorm(0.975)*se_delta,4),
+             "\n  ln-scale CI = (", round(lnOR - qnorm(0.975)*se_delta, 4), ", ", round(lnOR + qnorm(0.975)*se_delta, 4), ")",
+             if (delta != 1) paste0("\n  (* SE for \u0394-unit OR = |\u0394| \u00D7 SE = ", delta, " \u00D7 ", round(se,4), " = ", round(se_delta,4), ")") else "",
+             "\n\n\u2500\u2500\u2500 ANSWER: 95% CI FOR OR \u2500\u2500\u2500",
+             "\n  Exponentiate both bounds:",
+             "\n  \u2192\u2192\u2192  95% CI = (", round(CI[1], 4), ", ", round(CI[2], 4), ")  \u2190\u2190\u2190",
+             "\n\nWald test: z = \u03B2/SE = ", round(z, 4),
+             "\n  p-value = ", format.pval(pval, digits=4),
+             "\n\nInterpretation: This is the ", if(delta==1) "OR" else paste0("OR per ", delta, "-unit change"),
+             " ADJUSTED for all other predictors in the model.")
+    },
+    r_template = 'model <- glm(disease ~ group + bmi, data=df,
              family=binomial(link="logit"))
 summary(model)
-exp(coef(model))           # ORs
+exp(coef(model))           # ORs (per 1-unit for continuous)
 exp(confint.default(model)) # 95% CIs
-# Pearson residuals
-plot(resid(model, type="pearson")^2)', r_packages = "base R (glm)"),
+
+# --- From coefficients: dummy predictor ---
+beta <- 0.186; se <- 0.060
+OR <- exp(beta)  # vs reference group
+CI <- exp(beta + c(-1,1)*qnorm(0.975)*se)
+
+# --- From coefficients: continuous predictor (e.g., per 5-unit change) ---
+beta_bmi <- 0.107; se_bmi <- 0.004; delta <- 5
+OR_delta <- exp(delta * beta_bmi)
+CI_delta <- exp(delta*beta_bmi + c(-1,1)*qnorm(.975)*abs(delta)*se_bmi)
+cat("OR per", delta, "units =", round(OR_delta,4),
+    "  95% CI:", round(CI_delta,4), "\\n")', r_packages = "base R (glm)"),
+
+  logistic_predict = list(
+    title = "Logistic Regression: Predicted Probability", icon = "\U0001F3AF",
+    category = "Logistic Regression", cat_color = "#E84393",
+    description = "Plug covariate values into a fitted logistic model to predict the probability of disease for a specific individual profile.",
+    formula = "logit = \u03B1 + \u03B2\u2081x\u2081 + \u03B2\u2082x\u2082 + \u2026\np = 1 / (1 + e^(\u2212logit))",
+    notes = "RECOGNITION CUES:\n\u2022 'Predict the probability of [disease] for a [specific person]'\n\u2022 You are given ALL coefficients (intercept + predictors) and specific covariate values\n\u2022 For dummy predictors: x = 1 if the person is in that group, x = 0 otherwise\n\u2022 For continuous predictors: x = the actual value (e.g., BMI = 23)\n\nSTEPS:\n1. Multiply each \u03B2 by its x value\n2. Sum everything including the intercept = logit\n3. Convert: p = 1/(1 + e^(\u2212logit))",
+    has_input = TRUE, input_type = "logistic_predict",
+    r_code = function(intercept, b1, x1, b2, x2, b3, x3, b4, x4, b5, x5) {
+      terms <- list()
+      logit <- intercept
+      terms[[1]] <- paste0("  Intercept:     ", sprintf("%+.4f", intercept))
+      pairs <- list(list(b1,x1), list(b2,x2), list(b3,x3), list(b4,x4), list(b5,x5))
+      for (i in seq_along(pairs)) {
+        bi <- pairs[[i]][[1]]; xi <- pairs[[i]][[2]]
+        if (!is.null(bi) && !is.na(bi) && !is.null(xi) && !is.na(xi)) {
+          prod_i <- bi * xi; logit <- logit + prod_i
+          terms[[length(terms)+1]] <- paste0("  \u03B2", i, " \u00D7 x", i, ":    ",
+            sprintf("%+.4f", bi), " \u00D7 ", sprintf("%.4g", xi), " = ", sprintf("%+.4f", prod_i))
+        }
+      }
+      prob <- 1 / (1 + exp(-logit)); odds <- exp(logit)
+      paste0("LOGIT CALCULATION:\n",
+             paste(terms, collapse="\n"),
+             "\n  ", paste(rep("\u2500", 34), collapse=""),
+             "\n  logit = ", round(logit, 4),
+             "\n\nCONVERSION TO PROBABILITY:",
+             "\n  p = 1 / (1 + e^(\u2212logit))",
+             "\n  p = 1 / (1 + e^(", sprintf("%+.4f", -logit), "))",
+             "\n  p = 1 / (1 + ", round(exp(-logit), 4), ")",
+             "\n  p = ", round(prob, 4),
+             "\n\n  Odds = e^(logit) = ", round(odds, 4),
+             "\n\nPredicted probability = ", round(prob, 4), " (", round(prob*100, 2), "%)")
+    },
+    r_template = '# From fitted model:
+    # predict(model, newdata=data.frame(AA=0, Hispanic=1, BMI=23), type="response")
+
+# From coefficients by hand:
+logit <- -4.277 + 0.009*0 + 0.186*1 + 0.107*23
+p <- 1 / (1 + exp(-logit))
+cat("logit =", round(logit,4), "\\np =", round(p,4), "\\n")', r_packages = "base R"),
+
+  confounding_assessment = list(
+    title = "Confounding Assessment (Crude vs. Adjusted)", icon = "\U0001F50E",
+    category = "Logistic Regression", cat_color = "#E84393",
+    description = "Compare the crude OR (without covariate) to the adjusted OR (with covariate) to determine if confounding is present and its direction.",
+    formula = "Positive confounder: crude OR farther from 1 than adjusted OR\n   (crude overstates the association)\nNegative confounder: crude OR closer to 1 than adjusted OR\n   (crude understates the association)\nNo confounding: crude OR \u2248 adjusted OR",
+    notes = "RECOGNITION CUES:\n\u2022 Two models compared: one without a covariate, one with it\n\u2022 Question asks 'is X a confounder?' or 'what type of confounder?'\n\u2022 Must assume covariate is NOT in the causal pathway (otherwise it's a mediator, not confounder)\n\nDECISION RULE:\n\u2022 |ln(OR_crude)| > |ln(OR_adj)| \u2192 Positive confounder (inflates)\n\u2022 |ln(OR_crude)| < |ln(OR_adj)| \u2192 Negative confounder (masks)\n\u2022 |ln(OR_crude)| \u2248 |ln(OR_adj)| \u2192 Not a confounder\n\nCommon threshold: > 10% change in OR suggests meaningful confounding.",
+    has_input = TRUE, input_type = "confounding_assess",
+    r_code = function(or_crude, or_adj) {
+      ln_crude <- log(or_crude); ln_adj <- log(or_adj)
+      pct_change <- 100 * (or_crude - or_adj) / or_adj
+      abs_change <- abs(pct_change)
+      dist_crude <- abs(ln_crude); dist_adj <- abs(ln_adj)
+      direction <- if (abs_change < 10) {
+        "NOT A CONFOUNDER"
+      } else if (dist_crude > dist_adj) {
+        "POSITIVE CONFOUNDER"
+      } else {
+        "NEGATIVE CONFOUNDER"
+      }
+      explain <- if (abs_change < 10) {
+        "The crude and adjusted ORs are similar (< 10% change), suggesting the covariate does not confound this association."
+      } else if (dist_crude > dist_adj) {
+        "The crude OR is farther from 1.0 than the adjusted OR. The covariate was INFLATING the apparent association \u2014 making it look stronger than it truly is. This is positive confounding."
+      } else {
+        "The crude OR is closer to 1.0 than the adjusted OR. The covariate was MASKING the true association \u2014 making it look weaker than it truly is. This is negative confounding."
+      }
+      paste0("CRUDE vs. ADJUSTED COMPARISON:",
+             "\n  Crude OR:    ", round(or_crude, 4), "  (ln = ", round(ln_crude, 4), ", distance from null = ", round(dist_crude, 4), ")",
+             "\n  Adjusted OR: ", round(or_adj, 4), "  (ln = ", round(ln_adj, 4), ", distance from null = ", round(dist_adj, 4), ")",
+             "\n\n  % change: ", sprintf("%+.1f%%", pct_change),
+             "\n  |% change| = ", round(abs_change, 1), "%",
+             if (abs_change >= 10) " > 10% threshold \u2192 meaningful" else " < 10% threshold \u2192 minimal",
+             "\n\n\u2500\u2500\u2500 VERDICT \u2500\u2500\u2500",
+             "\n  \u2192 ", direction,
+             "\n\n", explain)
+    },
+    r_template = '# Crude model (no covariate)
+crude_model <- glm(disease ~ exposure, family=binomial, data=df)
+OR_crude <- exp(coef(crude_model)["exposure"])
+
+# Adjusted model (with covariate)
+adj_model <- glm(disease ~ exposure + bmi, family=binomial, data=df)
+OR_adj <- exp(coef(adj_model)["exposure"])
+
+# Compare
+cat("Crude OR:", round(OR_crude,4), "\\nAdjusted OR:", round(OR_adj,4),
+    "\\n% change:", round(100*(OR_crude-OR_adj)/OR_adj, 1), "\\n")', r_packages = "base R"),
 
   kaplan_meier = list(
     title = "Kaplan-Meier Estimator", icon = "\U0001F4C9",
@@ -293,56 +420,97 @@ cat("Combined OR:", round(exp(mu),2), "Q =", round(Q,2), "\\n")', r_packages = "
 # CSS
 # =============================================================================
 css <- '
-body { background: linear-gradient(160deg, #0c0c1d, #1a1a2e 40%, #16213e); color: #ddd; min-height: 100vh; }
-.navbar { background: rgba(12,12,29,.96) !important; border-bottom: 1px solid rgba(108,92,231,.25); backdrop-filter: blur(10px); }
-.navbar-brand { font-weight: 700 !important; font-size: 1.1rem !important; background: linear-gradient(135deg,#a29bfe,#6c5ce7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.navbar .nav-link { color: #aab !important; font-weight: 500; font-size: .84rem; border-radius: 6px; padding: 7px 14px !important; transition: .2s; margin: 0 1px; }
-.navbar .nav-link:hover, .navbar .nav-link.active { color: #fff !important; background: rgba(108,92,231,.18); }
-.well { background: rgba(18,18,40,.85) !important; border: 1px solid rgba(108,92,231,.18) !important; border-radius: 14px !important; padding: 20px 22px !important; }
-.well h5 { color: #a29bfe; font-weight: 600; font-size: .95rem; }
-.well .control-label { color: #a29bfe !important; font-weight: 600; font-size: .8rem; }
-.radio label { color: #bbc !important; font-size: .82rem; }
-.well hr { border-color: rgba(108,92,231,.12); margin: 12px 0; }
-.gate-title { color: #fdcb6e !important; font-weight: 700; font-size: .8rem; }
-.method-card { background: rgba(18,18,42,.72); border: 1px solid rgba(108,92,231,.14); border-radius: 16px; padding: 26px 30px; backdrop-filter: blur(6px); animation: fadeIn .3s ease; }
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+body { background: linear-gradient(160deg, #0a0f1a, #0d1b2a 40%, #1b2838); color: #dde; min-height: 100vh; font-family: "Plus Jakarta Sans", sans-serif !important; font-size: 15px; }
+
+/* ---- Navbar ---- */
+.navbar { background: rgba(10,15,26,.97) !important; border-bottom: 2px solid rgba(0,180,216,.2); backdrop-filter: blur(12px); padding: 6px 12px !important; }
+.navbar-brand { font-weight: 800 !important; font-size: 1.2rem !important; background: linear-gradient(135deg,#00b4d8,#55efc4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -.3px; }
+.navbar .nav-link { color: #8899aa !important; font-weight: 600; font-size: .88rem; border-radius: 12px; padding: 8px 16px !important; transition: all .25s ease; margin: 0 2px; font-family: "Plus Jakarta Sans", sans-serif !important; }
+.navbar .nav-link:hover { color: #55efc4 !important; background: rgba(0,180,216,.1); }
+.navbar .nav-link.active { color: #fff !important; background: rgba(0,180,216,.18); border: 1px solid rgba(0,180,216,.3); }
+
+/* ---- Well / Navigator Panel ---- */
+.well { background: rgba(13,27,42,.9) !important; border: 1px solid rgba(0,180,216,.18) !important; border-radius: 18px !important; padding: 22px 24px !important; }
+.well h5 { color: #00b4d8; font-weight: 700; font-size: 1.05rem; letter-spacing: -.2px; }
+.well .control-label { color: #00b4d8 !important; font-weight: 700; font-size: .88rem; }
+.radio label { color: #bcc8d4 !important; font-size: .9rem; font-weight: 500; }
+.radio input[type="radio"] { accent-color: #00b4d8; }
+.well hr { border-color: rgba(0,180,216,.12); margin: 14px 0; }
+.gate-title { color: #fdcb6e !important; font-weight: 700; font-size: .88rem; }
+
+/* ---- Method Card ---- */
+.method-card { background: rgba(13,27,42,.75); border: 1px solid rgba(0,180,216,.14); border-radius: 20px; padding: 28px 32px; backdrop-filter: blur(8px); animation: fadeIn .3s ease; }
 @keyframes fadeIn { from {opacity:0; transform:translateY(6px)} to {opacity:1; transform:translateY(0)} }
-.method-card h2 { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: 2px; }
-.method-icon { font-size: 1.6rem; margin-right: 8px; }
-.cat-badge { display:inline-block; padding:3px 11px; border-radius:18px; font-size:.7rem; font-weight:600; letter-spacing:.4px; text-transform:uppercase; margin-bottom:8px; }
-.method-desc { color:#bcc; font-size:.88rem; line-height:1.6; margin:12px 0; }
-.formula-box { background:rgba(108,92,231,.07); border:1px solid rgba(108,92,231,.22); border-radius:10px; padding:12px 16px; font-family:"Fira Code",monospace; font-size:.82rem; color:#ddd; white-space:pre-wrap; margin:12px 0; }
-.notes-box { background:rgba(253,203,110,.06); border-left:3px solid #fdcb6e; border-radius:0 8px 8px 0; padding:10px 14px; font-size:.8rem; color:#e0d4a8; margin:12px 0; }
+.method-card h2 { font-size: 1.55rem; font-weight: 800; color: #fff; margin-bottom: 4px; letter-spacing: -.3px; }
+.method-icon { font-size: 1.75rem; margin-right: 10px; }
+.cat-badge { display:inline-block; padding:4px 13px; border-radius:20px; font-size:.72rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin-bottom:10px; }
+.method-desc { color:#b0bec5; font-size:.95rem; line-height:1.65; margin:14px 0; }
+
+/* ---- Formula & Notes ---- */
+.formula-box { background:rgba(0,180,216,.06); border:1px solid rgba(0,180,216,.22); border-radius:12px; padding:14px 18px; font-family:"JetBrains Mono",monospace; font-size:.85rem; color:#dde; white-space:pre-wrap; margin:14px 0; }
+.notes-box { background:rgba(253,203,110,.06); border-left:3px solid #fdcb6e; border-radius:0 10px 10px 0; padding:12px 16px; font-size:.84rem; color:#e0d4a8; margin:14px 0; white-space:pre-wrap; }
 .notes-box strong { color:#fdcb6e; }
-.input-section { background:rgba(0,184,148,.05); border:1px solid rgba(0,184,148,.18); border-radius:12px; padding:18px 20px; margin:16px 0; }
-.input-section h5 { color:#55efc4; font-weight:600; font-size:.88rem; margin-bottom:10px; }
-.input-section .form-control { background:rgba(12,12,29,.85) !important; border:1px solid rgba(0,184,148,.25) !important; color:#eee !important; border-radius:8px; font-family:"Fira Code",monospace; font-size:.84rem; }
-.input-section label { color:#8fd8c0 !important; font-size:.75rem; font-weight:500; }
-.results-box { background:rgba(12,12,28,.92); border:1px solid rgba(108,92,231,.18); border-radius:10px; padding:14px 18px; font-family:"Fira Code",monospace; font-size:.8rem; color:#55efc4; white-space:pre-wrap; overflow-x:auto; margin-top:10px; }
-.code-section { margin-top:16px; }
-.code-section h5 { color:#a29bfe; font-weight:600; font-size:.86rem; }
-.code-box { background:#0b0b18; border:1px solid rgba(108,92,231,.18); border-radius:10px; padding:14px 18px; font-family:"Fira Code",monospace; font-size:.78rem; color:#d0d0d8; white-space:pre-wrap; overflow-x:auto; margin-top:6px; }
-.pkg-badge { display:inline-block; background:rgba(108,92,231,.12); color:#a29bfe; padding:2px 9px; border-radius:10px; font-size:.68rem; font-weight:600; margin-left:6px; }
-.btn-run { background:linear-gradient(135deg,#00b894,#00cec9) !important; color:#0c0c1d !important; border:none !important; font-weight:700 !important; border-radius:8px !important; padding:8px 22px !important; font-size:.84rem !important; }
-.btn-run:hover { box-shadow:0 4px 14px rgba(0,184,148,.3); }
-.btn-outline-secondary { border-color:rgba(108,92,231,.25) !important; color:#a29bfe !important; background:transparent !important; border-radius:8px !important; }
-.btn-outline-secondary:hover { background:rgba(108,92,231,.08) !important; }
-.placeholder-panel { text-align:center; padding:70px 20px; }
-.placeholder-panel h3 { color:#a29bfe; font-weight:700; }
-.placeholder-panel p { color:#777; max-width:480px; margin:8px auto; }
-.empty-state { text-align:center; padding:55px 20px; }
-.empty-state h4 { color:#a29bfe; font-weight:600; }
-.empty-state p { color:#888; max-width:380px; margin:6px auto; font-size:.88rem; }
-.help-hero { text-align:center; padding:36px 20px 24px; }
-.help-hero h2 { font-size:1.7rem; font-weight:700; background:linear-gradient(135deg,#a29bfe,#55efc4); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.help-hero p { color:#888; margin-top:4px; }
-.help-card { background:rgba(18,18,42,.7); border:1px solid rgba(108,92,231,.12); border-radius:14px; padding:20px 22px; margin-bottom:12px; transition:.2s; }
-.help-card:hover { border-color:rgba(108,92,231,.35); }
-.help-card h5 { color:#a29bfe; font-weight:600; font-size:.9rem; }
-.help-card p { color:#999; font-size:.82rem; margin-top:3px; }
-.selectize-input { background:rgba(12,12,29,.9) !important; border-color:rgba(108,92,231,.25) !important; color:#ddd !important; }
-.selectize-dropdown { background:rgba(18,18,40,.97) !important; border-color:rgba(108,92,231,.2) !important; }
-.selectize-dropdown-content .option { color:#bbb !important; }
-.selectize-dropdown-content .option.active { background:rgba(108,92,231,.25) !important; color:#fff !important; }
+
+/* ---- Input Section ---- */
+.input-section { background:rgba(0,184,148,.05); border:1px solid rgba(0,184,148,.18); border-radius:14px; padding:20px 22px; margin:18px 0; }
+.input-section h5 { color:#55efc4; font-weight:700; font-size:.95rem; margin-bottom:12px; }
+.input-section .form-control { background:rgba(10,15,26,.85) !important; border:1px solid rgba(0,184,148,.25) !important; color:#eee !important; border-radius:10px; font-family:"JetBrains Mono",monospace; font-size:.88rem; }
+.input-section label { color:#8fd8c0 !important; font-size:.8rem; font-weight:600; }
+
+/* ---- Results ---- */
+.results-box { background:rgba(10,15,26,.92); border:1px solid rgba(0,180,216,.2); border-radius:12px; padding:16px 20px; font-family:"JetBrains Mono",monospace; font-size:.84rem; color:#55efc4; white-space:pre-wrap; overflow-x:auto; margin-top:12px; }
+
+/* ---- Code Section ---- */
+.code-section { margin-top:18px; }
+.code-section h5 { color:#00b4d8; font-weight:700; font-size:.92rem; }
+.code-box { background:#080e18; border:1px solid rgba(0,180,216,.15); border-radius:12px; padding:14px 18px; font-family:"JetBrains Mono",monospace; font-size:.8rem; color:#d0d6dc; white-space:pre-wrap; overflow-x:auto; margin-top:8px; }
+.pkg-badge { display:inline-block; background:rgba(0,180,216,.1); color:#00b4d8; padding:2px 10px; border-radius:12px; font-size:.7rem; font-weight:700; margin-left:8px; }
+
+/* ---- Buttons ---- */
+.btn-run { background:linear-gradient(135deg,#00b894,#00cec9) !important; color:#0a0f1a !important; border:none !important; font-weight:700 !important; border-radius:10px !important; padding:9px 24px !important; font-size:.9rem !important; font-family:"Plus Jakarta Sans",sans-serif !important; letter-spacing:.2px; }
+.btn-run:hover { box-shadow:0 4px 16px rgba(0,184,148,.35); transform:translateY(-1px); }
+.btn-outline-secondary { border-color:rgba(0,180,216,.25) !important; color:#00b4d8 !important; background:transparent !important; border-radius:10px !important; font-family:"Plus Jakarta Sans",sans-serif !important; font-weight:600 !important; }
+.btn-outline-secondary:hover { background:rgba(0,180,216,.08) !important; }
+
+/* ---- Placeholders ---- */
+.placeholder-panel { text-align:center; padding:80px 20px; }
+.placeholder-panel h3 { color:#00b4d8; font-weight:800; font-size:1.4rem; }
+.placeholder-panel p { color:#6a7b8b; max-width:480px; margin:10px auto; font-size:.95rem; }
+
+/* ---- Empty State ---- */
+.empty-state { text-align:center; padding:60px 20px; }
+.empty-state h4 { color:#00b4d8; font-weight:700; font-size:1.15rem; }
+.empty-state p { color:#6a7b8b; max-width:400px; margin:8px auto; font-size:.92rem; }
+
+/* ---- Help Tab ---- */
+.help-hero { text-align:center; padding:40px 20px 28px; }
+.help-hero h2 { font-size:1.85rem; font-weight:800; background:linear-gradient(135deg,#00b4d8,#55efc4); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.help-hero p { color:#6a7b8b; margin-top:6px; font-size:.95rem; }
+.help-card { background:rgba(13,27,42,.75); border:1px solid rgba(0,180,216,.12); border-radius:16px; padding:22px 24px; margin-bottom:14px; transition:all .25s ease; }
+.help-card:hover { border-color:rgba(0,180,216,.35); transform:translateY(-2px); box-shadow:0 4px 14px rgba(0,180,216,.08); }
+.help-card h5 { color:#00b4d8; font-weight:700; font-size:.95rem; }
+.help-card p { color:#8899aa; font-size:.88rem; margin-top:4px; }
+
+/* ---- Dropdowns ---- */
+.selectize-input { background:rgba(10,15,26,.9) !important; border-color:rgba(0,180,216,.25) !important; color:#ddd !important; border-radius:10px !important; }
+.selectize-dropdown { background:rgba(13,27,42,.97) !important; border-color:rgba(0,180,216,.2) !important; border-radius:10px !important; }
+.selectize-dropdown-content .option { color:#bcc8d4 !important; }
+.selectize-dropdown-content .option.active { background:rgba(0,180,216,.2) !important; color:#fff !important; }
+
+/* ---- Hint Boxes ---- */
+.hint-box { border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+.hint-box p { margin:0; font-weight:600; font-size:.84rem; }
+.hint-box ul { margin:6px 0 0 0; padding-left:18px; font-size:.8rem; }
+.hint-box li { margin-bottom:2px; }
+.hint-cohort { background:rgba(0,180,216,.08); border:1px solid rgba(0,180,216,.25); }
+.hint-cohort p, .hint-cohort li { color:#5cc8e0; }
+.hint-cc { background:rgba(0,184,148,.08); border:1px solid rgba(0,184,148,.25); }
+.hint-cc p, .hint-cc li { color:#55efc4; }
+.hint-cs { background:rgba(253,203,110,.08); border:1px solid rgba(253,203,110,.25); }
+.hint-cs p, .hint-cs li { color:#fad390; }
+.hint-reg { background:rgba(232,67,147,.08); border:1px solid rgba(232,67,147,.25); }
+.hint-reg p, .hint-reg li { color:#e84393; }
 '
 
 # =============================================================================
@@ -351,7 +519,7 @@ body { background: linear-gradient(160deg, #0c0c1d, #1a1a2e 40%, #16213e); color
 ui <- navbarPage(
   title = "Biostatistical Methods",
   header = tags$head(
-    tags$link(href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap", rel = "stylesheet"),
+    tags$link(href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap", rel = "stylesheet"),
     tags$style(HTML(css))
   ),
 
@@ -363,13 +531,56 @@ ui <- navbarPage(
           h5("\U0001F9ED Scenario navigator"),
           radioButtons("entry", "What are you starting with?",
             choices = c("Categorical outcome (disease yes/no)" = "categorical",
+                        "Regression output (coefficients + SEs)" = "regression_output",
                         "Person-time data" = "persontime",
                         "Browse all methods" = "browse"),
             selected = character(0)),
+          conditionalPanel("input.entry=='regression_output'", hr(),
+            div(class="hint-box hint-reg",
+              tags$p("\U0001F4A1 You likely have logistic regression output if you see:"),
+              tags$ul(
+                tags$li("An intercept + predictor coefficients"),
+                tags$li("Standard errors for each coefficient"),
+                tags$li("The problem mentions 'regression model was run'"),
+                tags$li("Dummy-coded groups (reference category noted)"))),
+            radioButtons("reg_type", "What type of regression?",
+              choices = c("Logistic regression (binary outcome)" = "logistic",
+                          "Linear regression (continuous outcome)" = "linear_regression"),
+              selected = character(0))),
+          conditionalPanel("input.entry=='regression_output' && input.reg_type=='logistic'", hr(),
+            radioButtons("logistic_task", "What do you need to compute?",
+              choices = c("OR from a single coefficient" = "logistic_regression",
+                          "Predicted probability for a specific person" = "logistic_predict",
+                          "Assess confounding (crude vs. adjusted OR)" = "confounding_assessment"),
+              selected = character(0))),
           conditionalPanel("input.entry=='categorical'", hr(),
             radioButtons("study_type", "Study design?",
               choices = c("Cohort (prospective)"="cohort","Case-control"="case_control","Cross-sectional"="cross_sectional"),
-              selected = character(0))),
+              selected = character(0)),
+            conditionalPanel("input.study_type=='cohort'",
+              div(class="hint-box hint-cohort",
+                tags$p("\U0001F4A1 You likely have a cohort study if you see:"),
+                tags$ul(
+                  tags$li("Subjects classified by EXPOSURE, then followed for disease"),
+                  tags$li("Words like 'followed', 'prospective', 'incidence', 'risk'"),
+                  tags$li("You can count disease cases in both exposed and unexposed"),
+                  tags$li("All 3 measures available: RD, RR, and OR")))),
+            conditionalPanel("input.study_type=='case_control'",
+              div(class="hint-box hint-cc",
+                tags$p("\U0001F4A1 You likely have a case-control study if you see:"),
+                tags$ul(
+                  tags$li("Subjects selected by DISEASE status (cases vs. controls)"),
+                  tags$li("Exposure assessed retrospectively (looking back)"),
+                  tags$li("Words like 'cases', 'controls', 'retrospective', 'matched'"),
+                  tags$li("Only the OR is directly estimable (\u2248 RR if disease rare)")))),
+            conditionalPanel("input.study_type=='cross_sectional'",
+              div(class="hint-box hint-cs",
+                tags$p("\U0001F4A1 You likely have a cross-sectional study if you see:"),
+                tags$ul(
+                  tags$li("Exposure and disease measured at the SAME TIME"),
+                  tags$li("Words like 'prevalence', 'survey', 'at a single point in time'"),
+                  tags$li("Cannot establish which came first (no temporal sequence)"),
+                  tags$li("Prevalence ratio and OR estimable, but NOT true RR"))))),
           conditionalPanel("input.entry=='categorical' && input.study_type!=''", hr(),
             radioButtons("table_type", "Data structure?",
               choices = c("2 \u00D7 2 table"="2x2","2 \u00D7 k ordered"="2xk_ord","2 \u00D7 k unordered"="2xk_unord","R \u00D7 C table"="rxc"),
@@ -400,12 +611,14 @@ ui <- navbarPage(
               selected = character(0))),
           conditionalPanel("input.entry=='browse'", hr(),
             selectInput("browse_method", "Select method:",
-              choices = c(""="",
+              choices = c("-- Select method --"="",
                 "Cohort study"="cohort","Case-control"="case_control","Cross-sectional"="cross_sectional",
                 "Risk Difference"="risk_difference","Risk Ratio"="risk_ratio","Odds Ratio"="odds_ratio","Attributable Risk"="attributable_risk",
                 "Chi-square (2\u00D72)"="chi_square_2x2","Fisher's exact"="fisher_exact","Chi-square trend"="chi_square_trend","Chi-square heterogeneity"="chi_square_heterogeneity",
                 "Mantel-Haenszel"="mantel_haenszel","Homogeneity of ORs"="homogeneity_test","Effect modification"="effect_modification",
                 "Multiple logistic regression"="logistic_regression",
+                "Logistic: Predicted probability"="logistic_predict",
+                "Logistic: Confounding assessment"="confounding_assessment",
                 "Kaplan-Meier"="kaplan_meier","Log-rank test"="log_rank","Cox PH"="cox_ph",
                 "Meta-analysis"="meta_analysis","Equivalence studies"="equivalence_study","Cross-over design"="crossover"))),
           hr(),
@@ -465,6 +678,15 @@ server <- function(input, output, session) {
     if (!is.null(input$entry) && input$entry == "browse") {
       m <- input$browse_method; if (!is.null(m) && m != "") return(m); return(NULL)
     }
+    if (!is.null(input$entry) && input$entry == "regression_output") {
+      if (is.null(input$reg_type) || input$reg_type == "") return(NULL)
+      if (input$reg_type == "linear_regression") return("linear_regression")
+      if (input$reg_type == "logistic") {
+        if (!is.null(input$logistic_task) && input$logistic_task != "") return(input$logistic_task)
+        return(NULL)
+      }
+      return(NULL)
+    }
     if (!is.null(input$entry) && input$entry == "persontime") {
       if (!is.null(input$rates_constant) && input$rates_constant == "no" && !is.null(input$surv_goal))
         return(switch(input$surv_goal, km="kaplan_meier", logrank="log_rank", coxph="cox_ph", NULL))
@@ -520,19 +742,80 @@ server <- function(input, output, session) {
       if (!is.null(m$has_input) && m$has_input && m$input_type == "stratified")
         div(class="input-section",
           h5("\U0001F4E5 Enter stratified 2 \u00D7 2 tables"),
-          tags$p(style="color:#8fd8c0;font-size:.76rem;font-weight:600;", "Stratum 1"),
+          tags$p(style="color:#55efc4;font-size:.82rem;font-weight:700;", "Stratum 1"),
           fluidRow(
             column(3, numericInput("s1_a","a\u2081",value=NULL,min=0,width="100%")),
             column(3, numericInput("s1_b","b\u2081",value=NULL,min=0,width="100%")),
             column(3, numericInput("s1_c","c\u2081",value=NULL,min=0,width="100%")),
             column(3, numericInput("s1_d","d\u2081",value=NULL,min=0,width="100%"))),
-          tags$p(style="color:#8fd8c0;font-size:.76rem;font-weight:600;margin-top:6px;", "Stratum 2"),
+          tags$p(style="color:#55efc4;font-size:.82rem;font-weight:700;margin-top:6px;", "Stratum 2"),
           fluidRow(
             column(3, numericInput("s2_a","a\u2082",value=NULL,min=0,width="100%")),
             column(3, numericInput("s2_b","b\u2082",value=NULL,min=0,width="100%")),
             column(3, numericInput("s2_c","c\u2082",value=NULL,min=0,width="100%")),
             column(3, numericInput("s2_d","d\u2082",value=NULL,min=0,width="100%"))),
           actionButton("run_strat", "\u25B6  Run MH analysis", class="btn-run")),
+      if (!is.null(m$has_input) && m$has_input && m$input_type == "logistic_coef")
+        div(class="input-section",
+          h5("\U0001F4E5 Enter regression coefficient"),
+          div(class="hint-box hint-reg",
+            tags$p("\u03B2 = regression coefficient for the predictor of interest"),
+            tags$ul(
+              tags$li("For dummy-coded predictors: \u03B2 gives log(OR) vs. reference group, adjusted for all other predictors."),
+              tags$li("For continuous predictors: \u03B2 gives log(OR) per 1-unit increase. Use \u0394 for other increments."))),
+          radioButtons("pred_type", "Predictor type:",
+            choices = c("Binary / dummy-coded (e.g., ethnic group)" = "dummy",
+                        "Continuous (e.g., BMI, age)" = "continuous"),
+            selected = "dummy", inline = FALSE),
+          fluidRow(
+            column(4, numericInput("coef_beta", "\u03B2 (coefficient)", value=NULL, step=0.001, width="100%")),
+            column(4, numericInput("coef_se", "SE (standard error)", value=NULL, min=0, step=0.001, width="100%")),
+            column(4, conditionalPanel("input.pred_type=='continuous'",
+              numericInput("coef_delta", "\u0394 (unit change)", value=1, min=0.001, step=1, width="100%")))),
+          actionButton("run_logistic", "\u25B6  Compute OR", class="btn-run")),
+      if (!is.null(m$has_input) && m$has_input && m$input_type == "logistic_predict")
+        div(class="input-section",
+          h5("\U0001F4E5 Enter full model coefficients + covariate values"),
+          div(class="hint-box hint-reg",
+            tags$p("Enter the intercept, then each predictor\u2019s \u03B2 and the person\u2019s x value."),
+            tags$ul(
+              tags$li("For dummy predictors: x = 1 if person is in that group, x = 0 otherwise."),
+              tags$li("For continuous: x = actual value (e.g., BMI = 23). Leave unused rows blank."))),
+          fluidRow(column(6, numericInput("pred_intercept", "\u03B1 (intercept)", value=NULL, step=0.001, width="100%")),
+                   column(6)),
+          tags$p(style="color:#55efc4;font-size:.82rem;font-weight:700;margin-top:4px;", "Predictors"),
+          fluidRow(column(2, tags$label(style="color:#8899aa;font-size:.78rem;", "")),
+                   column(5, tags$label(style="color:#8899aa;font-size:.78rem;", "\u03B2 (coefficient)")),
+                   column(5, tags$label(style="color:#8899aa;font-size:.78rem;", "x (value)"))),
+          fluidRow(column(2, tags$label(style="color:#55efc4;font-size:.82rem;margin-top:8px;", "x\u2081")),
+                   column(5, numericInput("pred_b1", NULL, value=NULL, step=0.001, width="100%")),
+                   column(5, numericInput("pred_x1", NULL, value=NULL, step=0.001, width="100%"))),
+          fluidRow(column(2, tags$label(style="color:#55efc4;font-size:.82rem;margin-top:8px;", "x\u2082")),
+                   column(5, numericInput("pred_b2", NULL, value=NULL, step=0.001, width="100%")),
+                   column(5, numericInput("pred_x2", NULL, value=NULL, step=0.001, width="100%"))),
+          fluidRow(column(2, tags$label(style="color:#55efc4;font-size:.82rem;margin-top:8px;", "x\u2083")),
+                   column(5, numericInput("pred_b3", NULL, value=NULL, step=0.001, width="100%")),
+                   column(5, numericInput("pred_x3", NULL, value=NULL, step=0.001, width="100%"))),
+          fluidRow(column(2, tags$label(style="color:#55efc4;font-size:.82rem;margin-top:8px;", "x\u2084")),
+                   column(5, numericInput("pred_b4", NULL, value=NULL, step=0.001, width="100%")),
+                   column(5, numericInput("pred_x4", NULL, value=NULL, step=0.001, width="100%"))),
+          fluidRow(column(2, tags$label(style="color:#55efc4;font-size:.82rem;margin-top:8px;", "x\u2085")),
+                   column(5, numericInput("pred_b5", NULL, value=NULL, step=0.001, width="100%")),
+                   column(5, numericInput("pred_x5", NULL, value=NULL, step=0.001, width="100%"))),
+          actionButton("run_predict", "\u25B6  Predict probability", class="btn-run")),
+      if (!is.null(m$has_input) && m$has_input && m$input_type == "confounding_assess")
+        div(class="input-section",
+          h5("\U0001F50E Enter crude and adjusted ORs"),
+          div(class="hint-box hint-reg",
+            tags$p("Compare two models: one without the suspected confounder, one with it."),
+            tags$ul(
+              tags$li("Crude OR = from model WITHOUT the covariate."),
+              tags$li("Adjusted OR = from model WITH the covariate."),
+              tags$li("Compute each OR first using the \u2018OR from a single coefficient\u2019 tool, then enter both here."))),
+          fluidRow(
+            column(6, numericInput("or_crude", "Crude OR (no covariate)", value=NULL, min=0.001, step=0.01, width="100%")),
+            column(6, numericInput("or_adj", "Adjusted OR (with covariate)", value=NULL, min=0.001, step=0.01, width="100%"))),
+          actionButton("run_confound", "\u25B6  Assess confounding", class="btn-run")),
       uiOutput("results_panel"),
       div(class="code-section",
         h5("\U0001F4DD R code template", span(class="pkg-badge", m$r_packages %||% "base R")),
@@ -558,6 +841,34 @@ server <- function(input, output, session) {
     }, error = function(e) analysis_result(paste("Error:", e$message)))
   })
 
+  observeEvent(input$run_logistic, {
+    mid <- current_method(); m <- methods_db[[mid]]
+    req(m, m$r_code, input$coef_beta, input$coef_se)
+    delta <- if (!is.null(input$pred_type) && input$pred_type == "continuous" && !is.null(input$coef_delta)) input$coef_delta else 1
+    tryCatch({
+      analysis_result(m$r_code(input$coef_beta, input$coef_se, delta))
+    }, error = function(e) analysis_result(paste("Error:", e$message)))
+  })
+
+  observeEvent(input$run_predict, {
+    mid <- current_method(); m <- methods_db[[mid]]
+    req(m, m$r_code, input$pred_intercept)
+    tryCatch({
+      analysis_result(m$r_code(input$pred_intercept,
+        input$pred_b1, input$pred_x1, input$pred_b2, input$pred_x2,
+        input$pred_b3, input$pred_x3, input$pred_b4, input$pred_x4,
+        input$pred_b5, input$pred_x5))
+    }, error = function(e) analysis_result(paste("Error:", e$message)))
+  })
+
+  observeEvent(input$run_confound, {
+    mid <- current_method(); m <- methods_db[[mid]]
+    req(m, m$r_code, input$or_crude, input$or_adj)
+    tryCatch({
+      analysis_result(m$r_code(input$or_crude, input$or_adj))
+    }, error = function(e) analysis_result(paste("Error:", e$message)))
+  })
+
   output$results_panel <- renderUI({
     res <- analysis_result()
     if (is.null(res)) return(NULL)
@@ -566,7 +877,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$reset_btn, {
     analysis_result(NULL)
-    for (id in c("entry","study_type","table_type","confounding","mh_eligible","homog_result","rates_constant","surv_goal"))
+    for (id in c("entry","study_type","table_type","confounding","mh_eligible","homog_result","rates_constant","surv_goal","reg_type","pred_type","logistic_task"))
       updateRadioButtons(session, id, selected = character(0))
     updateSelectInput(session, "browse_method", selected = "")
   })
