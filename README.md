@@ -1,151 +1,83 @@
-# Biostatistical Methods Decision System
+# Dev Session Changelog — 2026-04-05
 
-An interactive R Shiny application that guides you through the complete decision-making workflow for biostatistical analysis — from identifying your study design to selecting the correct test, interpreting results, and running analyses live.
+## Session objective
 
-Built as a study and reference tool for the two-semester **PHST 681 Biostatistical Methods** sequence.
+Create an answered version of the HW4 Sports Medicine problem (TENNIS1.DAT,
+logistic regression) to test and guide the app's eventual Tennis tab, then
+document implementation steps.
 
----
+## What was produced
 
-## Features
+### Files created
 
-**Scenario navigator** — Walk through a step-by-step decision tree that mirrors the analytical workflow taught in class. Each decision gate asks a question about your data and routes you to the correct method.
+| File | Purpose |
+|------|---------|
+| `bsmet-nav_test_2_ANSWERED.Rmd` | Answered homework — went through multiple revisions (see below). Superseded by the canonical answers in `tennis_tab_dev_reference.Rmd`. |
+| `tennis_tab_dev_reference.Rmd` | **Primary deliverable.** Contains gap analysis, canonical answers for all 6 problems, and full implementation plan for adding a Tennis tab to `app.R`. |
+| `integration_guidance.md` | Early-session integration notes. Superseded by the dev reference Rmd. |
 
-**Live analysis** — Enter cell counts from a 2×2 table (or stratified tables for Mantel-Haenszel) and run the analysis directly in the app. Results are computed in R and displayed instantly.
+### No changes were made to `app.R`
 
-**Decision gates** — Key routing checkpoints are built into the flow:
-- Sample size check (χ² vs Fisher's exact)
-- Causal pathway check (should you control for this confounder?)
-- MH eligibility (binary/categorical vs continuous variables)
-- Homogeneity of ORs (confounding vs effect modification)
-- OR interpretation (binary vs continuous vs categorical predictors)
+The app file was not modified during this session. All output is documentation
+and planning for the next dev session.
 
-**R code templates** — Every method includes a copy-ready R code template so you can reproduce the analysis in your own scripts or R Markdown files.
+## Issues identified in the app (as attached)
 
-**Browse mode** — Skip the decision tree and jump directly to any method from a dropdown menu.
+1. **No Tennis/HW4 tab exists.** The current app (886 lines) has only the
+   Epidemiologic Studies tab (working) and four placeholder tabs. The project
+   file version (1717 lines, in project files) had an elaborate Test 2
+   implementation that was over-engineered.
 
----
+2. **The project-file version's Test 2 tab collapsed sparse categories**
+   (Wgt_curr light→medium, Str_curr synthetic→gut) before fitting the model.
+   This step is not supported by the lesson material and produces different
+   coefficients (n=427, intercept=-2.12) than the straightforward fit the
+   homework expects (n=425, intercept=9.51).
 
-## Sections
+3. **The project-file version did not treat Age=99 as missing.** The data
+   contains 2 observations with Age=99, which are implausible for tennis
+   players and should be coded NA. This accounts for the n=427 vs n=425
+   discrepancy.
 
-| Tab | Status | Coverage |
-|-----|--------|----------|
-| Epidemiologic Studies | ✅ Active | Study design, measures of effect, contingency table tests, confounding/MH, logistic regression, survival, meta-analysis, equivalence, cross-over |
-| Person-Time & Survival | 🔲 Placeholder | Incidence rates, Kaplan-Meier, log-rank, Cox PH |
-| Categorical Data | 🔲 Placeholder | Binomial tests, 2×2 tables, R×C tables, McNemar's, Kappa (semester 1) |
-| Multisample Inference | 🔲 Placeholder | ANOVA, Kruskal-Wallis, multiple comparisons (semester 1) |
-| Regression & Correlation | 🔲 Placeholder | Linear regression, partial correlation, Fisher's z (semester 1) |
-| Help | 🔲 Stub | Guided wizard for users who aren't sure where to start |
+## Revisions during the session
 
----
+The answered Rmd went through **7 rounds of revision** based on review against
+the lesson material and the expected answer format:
 
-## Installation
+1. **v1:** Over-built — 5-step Problem 1, collapsing in Problem 2, dummy
+   coding tables, hand verification sections, extensive quasi-separation notes.
+2. **v2:** Removed collapsing. Re-ran analysis in R (installed R in container)
+   to get correct uncollapsed coefficients.
+3. **v3:** Rewrote LaTeX equation to match textbook Eq 13.23 notation
+   (α + β₁x₁ + ⋯ + βₖxₖ).
+4. **v4:** Simplified equation to variable-level (6 terms, not 13 dummies).
+5. **v5:** Expanded back to all dummy terms with numerical coefficients per
+   user request (`X_{varname}` notation).
+6. **v6:** Removed redundant Problem 3 code chunk. Simplified Problem 3
+   answer to variable level, then restored dummy-level per user request.
+7. **v7:** Trimmed Problems 4–5 to just β → OR → percent change (removed
+   CIs, p-values, 5-year scaling). Added missing `(OR-1)×100` calculations.
 
-### Prerequisites
+## Key decisions recorded
 
-- **R** (≥ 4.0)
-- **RStudio** (recommended, not required)
+- **No collapsing of sparse categories.** The homework says "fit the model
+  with risk factors" — do exactly that.
+- **Age=99 is missing.** Treat as NA.
+- **Equation format:** Single-line `$$` with all 13 dummy terms, numerical
+  coefficients, `X_{varname}` subscript notation.
+- **Answer scope:** Match the question. "Interpret in terms of an OR" = β →
+  OR → percent change → one sentence. No CIs or significance testing unless
+  asked.
+- **Quasi-separation from Wgt_curr=1:** Real issue (inflated intercept/SEs),
+  but not something the homework asks about. Don't include in submitted answer.
 
-### Required packages
+## Next steps
 
-```r
-install.packages(c("shiny", "bslib"))
-```
+See `tennis_tab_dev_reference.Rmd` § "Implementation Plan" for the full
+build spec. Summary:
 
-### Optional packages
-
-```r
-install.packages("survival")    # for Kaplan-Meier, log-rank, Cox PH
-install.packages("DescTools")   # for Breslow-Day test (homogeneity of ORs)
-```
-
----
-
-## Usage
-
-### From RStudio
-
-1. Open `app.R` in RStudio
-2. Click **Run App**
-
-### From the R console
-
-```r
-shiny::runApp("path/to/biostat_app")
-```
-
-### Navigating the app
-
-1. **Choose an entry point** — categorical outcome, person-time data, or browse directly
-2. **Answer each decision gate** — the sidebar reveals the next question based on your previous answer
-3. **View the method card** — description, formula, key notes, and R code template
-4. **Enter your data** (where available) — fill in cell counts and click **Run analysis**
-5. **Copy the R template** to use in your own R Markdown homework files
-
----
-
-## Project structure
-
-```
-biostat_app/
-├── app.R          # Single-file Shiny application (UI + server + methods database)
-└── README.md      # This file
-```
-
-The entire app lives in a single `app.R` file. The `methods_db` list at the top is the content database — every method is defined as a named list with title, category, description, formula, notes, R code function (for live analysis), and R code template (for copy-paste). To add a new method, add an entry to `methods_db` and wire it into the navigator's `conditionalPanel` logic.
-
----
-
-## Extending the app
-
-### Adding a new method
-
-Add an entry to `methods_db`:
-
-```r
-new_method = list(
-  title = "Method Name",
-  icon = "🔧",
-  category = "Category Name",
-  cat_color = "#HEX",
-  description = "What it does.",
-  formula = "The formula",
-  notes = "Key caveats.",
-  has_input = TRUE,          # FALSE if no data input panel
-  input_type = "2x2",        # "2x2", "stratified", or "none"
-  r_code = function(a, b, cc, d) {
-    # Compute and return a string of results
-    paste0("Result: ", round(some_value, 4))
-  },
-  r_template = '# Copyable R code template',
-  r_packages = "base R"
-)
-```
-
-### Adding a new section tab
-
-1. Add a `tabPanel()` to the `navbarPage()` in the UI
-2. Create a new navigator sidebar with `conditionalPanel()` gates
-3. Wire the server logic to resolve the selected method
-
----
-
-## Roadmap
-
-- [ ] Complete Epidemiologic Studies section with all homework/quiz-relevant methods
-- [ ] Build Person-Time & Survival module
-- [ ] Port semester 1 content (Categorical Data, Multisample Inference, Regression & Correlation)
-- [ ] Wire up the Help tab as an interactive guided wizard
-- [ ] Add data upload (CSV/file) support for logistic regression and survival analysis nodes
-- [ ] Add printable summary / export-to-Rmd feature
-
----
-
-## License
-
-This is a personal educational tool. Not intended for clinical or production use.
-
----
-
-## Acknowledgments
-
-Course materials from PHST 681 Biostatistical Methods (University of Louisville), based on Rosner, *Fundamentals of Biostatistics*.
+1. Add a "Practice Problems" `tabPanel` to `app.R`
+2. Create 6 panel functions (`hw4_p1()` through `hw4_p6()`) using existing
+   CSS classes
+3. Wire up a `selectInput` + `renderUI` in the server
+4. ~120–150 new lines of code, no new packages or CSS needed
